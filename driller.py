@@ -154,7 +154,7 @@ class Driller(object):
 
                     l.debug("found %x -> %x transition", transition[0], transition[1])
 
-                    if not self._has_encountered(transition) and not self._has_false(path):  
+                    if not self._has_encountered(transition):  
                         t.remove_preconstraints(path)
 
                         if path.state.satisfiable():
