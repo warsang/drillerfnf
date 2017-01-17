@@ -1,7 +1,6 @@
 import logging
 
 l = logging.getLogger("driller.Driller")
-
 import tracer
 
 import angr
@@ -164,8 +163,8 @@ class Driller(object):
 
                     l.debug("found %x -> %x transition", transition[0], transition[1])
 
-                    #if not hit and not self._has_encountered(transition) and not self._has_false(path):
-		    if True : 
+                    if not self._has_encountered(transition) and not self._has_false(path):
+		    #if len(branches.active) > 1 :  
                         t.remove_preconstraints(path)
 
                         if path.state.satisfiable():
@@ -286,9 +285,8 @@ class Driller(object):
         t_pos = path.state.posix.files[0].pos
         path.state.posix.files[0].seek(0)
         # read up to the length
-	IPython.embed()
         generated = path.state.posix.read_from(0, t_pos)
-	IPython.embed()
+	#IPython.embed()
         generated = path.state.se.any_str(generated)
         path.state.posix.files[0].seek(t_pos)
 
