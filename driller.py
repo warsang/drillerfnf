@@ -11,7 +11,7 @@ import signal
 import resource
 import cPickle as pickle
 from itertools import islice, izip
-import IPython
+
 
 import config #pylint:disable=relative-import
 
@@ -30,16 +30,13 @@ class Driller(object):
         '''
         :param binary: the binary to be traced
         :param input: input string to feed to the binary
-        :param fuzz_bitmap: AFL's bitmap of state transitions
         :param redis: redis.Redis instance for coordinating multiple Driller instances
         :param hooks: dictionary of addresses to simprocedures
         '''
 
         self.binary      = binary
-        # redis channel identifier
         self.identifier  = os.path.basename(binary)
         self.input       = input
-        #self.fuzz_bitmap = fuzz_bitmap
         self.tag         = tag
         self.redis       = redis
 
@@ -63,7 +60,6 @@ class Driller(object):
 
         l.info("[%s] drilling started on %s", self.identifier, time.ctime(self.start_time))
 
-        #self.fuzz_bitmap_size = len(self.fuzz_bitmap)
 
         # setup directories for the driller and perform sanity checks on the directory structure here
         if not self._sane():
@@ -137,8 +133,7 @@ class Driller(object):
         l.debug("drilling into %r", self.input)
         l.debug("input is %r", self.input)
 
-        # used for finding the right index in the fuzz_bitmap
-        prev_loc = 0
+
 
         branches = t.next_branch()
         while len(branches.active) > 0 and t.bb_cnt < len(t.trace):
@@ -147,28 +142,23 @@ class Driller(object):
             if self.redis and self.redis.sismember(self.identifier + "-finished", True):
                 return
 
-            # mimic AFL's indexing scheme
+ 
             if len(branches.missed) > 0:
                 prev_addr = branches.missed[0].addr_trace[-1] # a bit ugly
-                prev_loc = prev_addr
-                #prev_loc &= self.fuzz_bitmap_size - 1
+
+
                 for path in branches.missed:
-                    cur_loc = path.addr
-                    #cur_loc &= self.fuzz_bitmap_size - 1
-		    
-   		    #hit = False
-                    #hit = bool(ord(self.fuzz_bitmap[cur_loc ^ prev_loc]) ^ 0xff)
+
 
                     transition = (prev_addr, path.addr)
 
                     l.debug("found %x -> %x transition", transition[0], transition[1])
 
-                    if not self._has_encountered(transition) and not self._has_false(path):
-		    #if len(branches.active) > 1 :  
+                    if not self._has_encountered(transition) and not self._has_false(path):  
                         t.remove_preconstraints(path)
 
                         if path.state.satisfiable():
-                            # a completely new state transitions, let's try to accelerate AFL
+                            # a completely new state transitions, let's try to accelerate the fuzzer
                             # by finding  a number of deeper inputs
                             l.info("found a completely new transition, exploring to some extent")
                             w = self._writeout(prev_addr, path)
@@ -286,14 +276,13 @@ class Driller(object):
         path.state.posix.files[0].seek(0)
         # read up to the length
         generated = path.state.posix.read_from(0, t_pos)
-	#IPython.embed()
         generated = path.state.se.any_str(generated)
         path.state.posix.files[0].seek(t_pos)
 
         key = (len(generated), prev_addr, path.addr)
 
         # checks here to see if the generation is worth writing to disk
-        # if we generate too many inputs which are not really different we'll seriously slow down AFL
+        # if we generate too many inputs which are not really different we'll seriously slow down the fuzzer
         if self._in_catalogue(*key):
             return
         else:
